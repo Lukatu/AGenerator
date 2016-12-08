@@ -2,7 +2,8 @@
 Analytics Code Generator
 
 # Layout File - main.json
-```{
+```javascript
+{
   "screens":[
     {
       "name":"SignIn",
