@@ -1,0 +1,31 @@
+group 'com.lukatu'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'application'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+version = '1.0'
+sourceCompatibility = 1.5
+mainClassName = 'com.lukatu.agenerator.Main'
+
+task fatJar(type: Jar) {
+    manifest {
+        attributes 'Implementation-Title': 'Analytics Code Generator',
+                'Implementation-Version': version,
+                'Main-Class': mainClassName
+    }
+    baseName = project.name
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+    buildDir projectDir
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.json:json:20160810'
+    compile group: 'commons-cli', name: 'commons-cli', version: '1.2'
+}
