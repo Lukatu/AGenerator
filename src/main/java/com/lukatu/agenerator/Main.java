@@ -1,12 +1,17 @@
 package com.lukatu.agenerator;
 
+import com.lukatu.agenerator.converter.Converter;
+import com.lukatu.agenerator.converter.ConverterJava;
+import com.lukatu.agenerator.converter.ConverterObjectiveC;
+import com.lukatu.agenerator.label.Label;
+import com.lukatu.agenerator.label.LabelEnum;
+import com.lukatu.agenerator.label.LabelRaw;
 import org.apache.commons.cli.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,10 +19,10 @@ public class Main {
     private static final String LAYOUT_FILE_DEFAULT = "main.json";
 
     public static void main(String[] args) throws Exception {
-        final Option oJavaPackage, oJavaOutput, oObjcOutput;
+        final Option oClassName, oJavaPackage, oJavaOutput, oObjcOutput;
         final Options options = new Options();
         options.addOption(new Option("l", "layout", true, "Layout file path. Default - " + LAYOUT_FILE_DEFAULT));
-        options.addOption(new Option("c", "class", true, "Class name"));
+        options.addOption(oClassName = new Option("c", "class", true, "Class name"));
         options.addOption(oJavaPackage = new Option("p", "java_package", true, "Java package"));
         options.addOption(oJavaOutput = new Option("k", "java_output", true, "Java output"));
         options.addOption(new Option("f", "objc_prefix", true, "Objective-C classes prefix"));
@@ -34,7 +39,7 @@ public class Main {
 
         String layoutFile = commandLine.getOptionValue('l', null);
         if (layoutFile == null) {
-            System.out.println("Layout file path not defined. Using default - \""+LAYOUT_FILE_DEFAULT+"\".");
+            System.out.println("Layout file path not defined. Using default - \"" + LAYOUT_FILE_DEFAULT + "\".");
             layoutFile = LAYOUT_FILE_DEFAULT;
         }
         final String className = commandLine.getOptionValue('c');
@@ -49,6 +54,9 @@ public class Main {
         final List<Converter> converters = new ArrayList<Converter>();
         final List<Screen> screens;
         try {
+            if (className == null) {
+                E.e(oClassName);
+            }
             if (!hasJava && !hasObjC) {
                 throw new E("At least one language must be specified.");
             }
@@ -76,12 +84,10 @@ public class Main {
         }
 
 
-
-
         for (Converter converter : converters) {
             final List<File> files = converter.convert(screens);
             for (File file : files) {
-                System.out.println("[DONE] "+converter.name + " -> " +file.getAbsolutePath());
+                System.out.println("[DONE] " + converter.name + " -> " + file.getAbsolutePath());
             }
         }
     }
@@ -94,7 +100,7 @@ public class Main {
             fin = new FileInputStream(file);
             content = Utils.readAll(fin, new StringBuilder((int) file.length()));
         } catch (Exception e) {
-            throw new E("File can't be read \""+path+"\".");
+            throw new E("File can't be read \"" + path + "\".");
         } finally {
             if (fin != null) {
                 fin.close();
@@ -107,14 +113,55 @@ public class Main {
         final ArrayList<Screen> result = new ArrayList<Screen>(screenCount);
         for (int i = 0; i < screenCount; ++i) {
             final JSONObject screen = screens.getJSONObject(i);
-            final JSONArray events = screen.getJSONArray("events");
-            final int eventsCount = events.length();
-            final Event eventsArray[] = new Event[eventsCount];
-            for (int j = 0; j < eventsCount; ++j) {
-                eventsArray[j] = new Event(events.getString(j));
+            final JSONObject events = screen.getJSONObject("events");
+            final List<Event> eventsList = new ArrayList<Event>();
+            for (String eventName : events.keySet()) {
+                Object eventValue = events.get(eventName);
+                final Label label;
+                if (eventValue instanceof String) {
+                    String lCmd = (String) eventValue;
+                    if (lCmd.equals("$")) {
+                        label = null;
+                    } else {
+                        final String[] parts = lCmd.split(" ");
+                        if (parts.length != 2) {
+                            throw new E("invalid label format, must be only 2 parts");
+                        }
+                        final String type = parts[0];
+                        if (! type.startsWith("$")) {
+                            throw new E("invalid label value format, should start with $");
+                        }
+                        final String labelName = parts[1];
+                        final LabelRaw.Type labelType;
+                        try {
+                            labelType = LabelRaw.Type.valueOf(type.substring(1));
+                        } catch (IllegalArgumentException e) {
+                            throw new E("invalid label value format, should start with $");
+                        }
+
+                        label = new LabelRaw(labelName, labelType);
+                    }
+                } else if (eventValue instanceof JSONArray) {
+                    final JSONArray eventEnumArray = (JSONArray) eventValue;
+                    final int eventEnumArrayCount = eventEnumArray.length();
+                    final List<String> eventEnumValueList = new ArrayList<String>();
+                    for (int z = 0; z < eventEnumArrayCount; ++z) {
+                        final Object eventEnumValue = eventEnumArray.get(z);
+                        if (eventEnumValue instanceof String) {
+                            eventEnumValueList.add((String) eventEnumValue);
+                        } else {
+                            throw new E("invalid label enum value, supporting only \"string\"");
+                        }
+                    }
+                    label = new LabelEnum(eventEnumValueList);
+                } else {
+                    throw new E("invalid label value, support either $[empty], $[type] or enums - []");
+                }
+
+                eventsList.add(new Event(eventName, label));
             }
 
-            result.add(new Screen(screen.getString("name"), eventsArray));
+            result.add(new Screen(screen.getString("name"), eventsList));
         }
 
         return result;
@@ -126,7 +173,7 @@ public class Main {
         }
 
         public static void e(Option option) throws E {
-            throw new E(option.getLongOpt()+" is empty");
+            throw new E(option.getLongOpt() + " is empty");
         }
     }
 }

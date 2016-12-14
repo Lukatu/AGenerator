@@ -1,4 +1,6 @@
-package com.lukatu.agenerator;
+package com.lukatu.agenerator.converter;
+
+import com.lukatu.agenerator.Screen;
 
 import java.io.File;
 import java.io.IOException;

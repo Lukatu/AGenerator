@@ -17,6 +17,15 @@ public class Utils {
         }
     }
 
+    public static String suffixName(String name) {
+        final char first = name.charAt(0);
+        if (Character.isUpperCase(first)) {
+            return name;
+        } else {
+            return Character.toUpperCase(first) + name.substring(1);
+        }
+    }
+
     public static String fieldName(String name) {
         return name.toLowerCase();
     }
